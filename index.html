@@ -33,6 +33,11 @@ body {
   stroke: steelblue;
 }
 
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
 </style>
 
 <head>
@@ -40,12 +45,37 @@ body {
 </head>
 
 <body>
-<script src="https://d3js.org/d3.v4.min.js"></script>
-<script src="http://stephenandrewtaylor.net/js/web-audio-api-shim.js"></script>
-<script src="http://stephenandrewtaylor.net/js/soundfont-player.js"></script>
+<script src="../d3/d3.v4.js"></script>
+<script src="../js/web-audio-api-shim.js"></script>
+<script src="../js/soundfont-player.js"></script>
+
+<div id="dropdown">
+  <select id = "selectSound">
+    <option value = "marimba" selected>Marimba</option>
+    <option value = "acoustic_grand_piano">Acoustic Grand Piano</option>
+    <option value = "vibraphone">Vibraphone</option>
+    <option value = "celesta">Celesta</option>
+    <option value = "electric_guitar_jazz">Electric Guitar (Jazz)</option>
+  </select>
+</div>
+
+<div id="chartContainer">
 <script>
 var ac = new AudioContext();
-Soundfont.instrument(ac, 'marimba', {soundfont: 'FluidR3_GM'}).then(function (piano) {
+
+// get current General Midi sound
+var selectMenu = document.getElementById("selectSound");
+var chosenOption = selectMenu.options[selectMenu.selectedIndex];
+// console.log("sound = " + chosenOption.value);
+
+
+
+selectMenu.onchange = function() {
+  chosenOption = this.options[this.selectedIndex];
+  console.log("sound = " + chosenOption.value);
+  Soundfont.instrument(ac, chosenOption.value).then(playmidi);
+ }
+ 
 
 var bottomNote = 48;	// 21 == lowest midi note of piano
 var topNote = 108;		// 108 == highest midi note of piano
@@ -82,7 +112,15 @@ var svg = d3.select("body").append("svg")
   .append("g")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-// load in data - it would be amazing to be able to substitute your own data here!
+// midi playback incorporates the d3 data code    
+
+
+
+playmidi = function (piano) {
+
+console.log("sound2 = " + chosenOption.value);
+
+// load in data - it would be nice to be able to substitute your own data here via a menu, etc.
 d3.tsv("data.tsv", function(error, data) {
   if (error) throw error;
 
@@ -102,7 +140,7 @@ d3.tsv("data.tsv", function(error, data) {
   var midiPitch = d3.scaleLinear()
 	.domain(d3.extent(data, function(d) { return d.close; }))
 	.rangeRound([bottomNote, topNote])	// .rangeRound to get integers for midi pitches
-	.nice(); 		// .nice is only necessary if you're not using rangeRound, but it doesn't hurt anything
+	// .nice(); 		// .nice is only necessary if you're not using rangeRound, but it doesn't hurt anything
 
   svg.append("g")
       .attr("class", "x axis")
@@ -142,7 +180,7 @@ d3.tsv("data.tsv", function(error, data) {
       .on("mouseover", function() { focus.style("display", null); })
       .on("mouseout", function() { focus.style("display", "none"); })
       .on("mousemove", mousemove);
-
+      
   function mousemove() {  
     var x0 = x.invert(d3.mouse(this)[0]),
         i = bisectDate(data, x0, 1),
@@ -151,13 +189,20 @@ d3.tsv("data.tsv", function(error, data) {
         d = x0 - d0.date > d1.date - x0 ? d1 : d0;
     focus.attr("transform", "translate(" + x(d.date) + "," + y(d.close) + ")");
     focus.select("text").text(formatCurrency(d.close));
+
     // play midiPitch
+
     console.log("y = " + midiPitch(d.close));
     piano.play(midiPitch(d.close), ac.currentTime, { duration: 0.15 });
-  }
+    };
  });
-}) // the whole thing is wrapped in the Soundfont function
+}
+
+Soundfont.instrument(ac, 'marimba').then(playmidi);
+ // the whole thing is wrapped in the Soundfont function
+// } // from selectMenu function
 </script>
+</div>
+
 </body>
 </html>
-
