@@ -68,8 +68,6 @@ var selectMenu = document.getElementById("selectSound");
 var chosenOption = selectMenu.options[selectMenu.selectedIndex];
 // console.log("sound = " + chosenOption.value);
 
-
-
 selectMenu.onchange = function() {
   chosenOption = this.options[this.selectedIndex];
   console.log("sound = " + chosenOption.value);
@@ -113,8 +111,6 @@ var svg = d3.select("body").append("svg")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 // midi playback incorporates the d3 data code    
-
-
 
 playmidi = function (piano) {
 
@@ -191,9 +187,10 @@ d3.tsv("data.tsv", function(error, data) {
     focus.select("text").text(formatCurrency(d.close));
 
     // play midiPitch
-
-    console.log("y = " + midiPitch(d.close));
-    piano.play(midiPitch(d.close), ac.currentTime, { duration: 0.15 });
+    if (x0 % 2 == 0) {		// don't playback every single x, it sounds too messy
+      console.log("y = " + midiPitch(d.close));
+      piano.play(midiPitch(d.close), ac.currentTime, { duration: 0.15 });
+      };
     };
  });
 }
