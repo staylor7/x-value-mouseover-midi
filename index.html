@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <meta charset="utf-8">
 <style>
 
 body {
-  font: 10px sans-serif;
+  font: 12px sans-serif;
 }
 
 .axis path,
@@ -21,6 +22,12 @@ body {
   fill: none;
   stroke: steelblue;
   stroke-width: 1.5px;
+}
+
+.linewhite {
+   fill: none;
+   stroke: white;
+   stroke-width: 2px;
 }
 
 .overlay {
@@ -41,40 +48,59 @@ body {
 </style>
 
 <head>
-<title>X-Value Mouseover</title>
+<title>X-Value Mouseover Sonification</title>
 </head>
 
 <body>
-<script src="../d3/d3.v4.js"></script>
+<script src="https://d3js.org/d3.v3.min.js"></script> <!-- use newest version of d3? -->
 <script src="../js/web-audio-api-shim.js"></script>
-<script src="../js/soundfont-player.js"></script>
+<script src="../js/soundfont-player.min.js"></script>
 
-<div id="dropdown">
+<h1>X Value Mouseover Sonification</h1>
+<h2>Apple stock price, 2007-2012; click anywhere to start audio, then move the mouse.</h2>
+
+<div>
+Choose a sound for playback 
+<span id="dropdown">
   <select id = "selectSound">
     <option value = "marimba" selected>Marimba</option>
     <option value = "acoustic_grand_piano">Acoustic Grand Piano</option>
     <option value = "vibraphone">Vibraphone</option>
-    <option value = "celesta">Celesta</option>
     <option value = "electric_guitar_jazz">Electric Guitar (Jazz)</option>
   </select>
+  </span>
+<!-- Choose a musical scale (Does not work yet)
+<span id="dropdown">
+  <select id = "selectPitches">
+    <option value = "diatonic">Diatonic</option>
+    <option value = "chromatic">Chromatic</option>
+  </select>
+</span> -->
 </div>
+
+<br>
 
 <div id="chartContainer">
 <script>
 var ac = new AudioContext();
 
 // get current General Midi sound
-var selectMenu = document.getElementById("selectSound");
-var chosenOption = selectMenu.options[selectMenu.selectedIndex];
-// console.log("sound = " + chosenOption.value);
+var selectInstrument = document.getElementById("selectSound");
+var chosenOption = selectInstrument.options[selectInstrument.selectedIndex];
+// var selectPitches = document.getElementById("selectPitches");
+// var chosenPitches = selectPitches.options[selectPitches.selectedIndex];
 
-selectMenu.onchange = function() {
+selectInstrument.onchange = function() {
   chosenOption = this.options[this.selectedIndex];
-  console.log("sound = " + chosenOption.value);
-  Soundfont.instrument(ac, chosenOption.value).then(playmidi);
- }
+  // console.log("sound = " + chosenOption.value);
+  Soundfont.instrument(ac, chosenOption.value).then(playmidi); // when user selects a new instrument, playmidi function is triggered
+  }
  
-
+/* selectPitches.onchange = function() {
+  chosenPitches = this.options[this.selectedIndex];
+  console.log("chosenPitches = " + chosenPitches.value);
+  }    */
+ 
 var bottomNote = 48;	// 21 == lowest midi note of piano
 var topNote = 108;		// 108 == highest midi note of piano
 
@@ -83,26 +109,28 @@ var margin = {top: 20, right: 50, bottom: 30, left: 50},
     width = 960 - margin.left - margin.right,
     height = 500 - margin.top - margin.bottom;
 
-var parseDate = d3.timeParse("%d-%b-%y"),
+var parseDate = d3.time.format("%d-%b-%y").parse,
     bisectDate = d3.bisector(function(d) { return d.date; }).left,
     formatValue = d3.format(",.2f"),
     formatCurrency = function(d) { return "$" + formatValue(d); };
 
-var x = d3.scaleTime()
+var x = d3.time.scale()
     .range([0, width]);
 
-var y = d3.scaleLinear()
+var y = d3.scale.linear()
     .range([height, 0]);
 
-var xAxis = d3.axisBottom()
+var xAxis = d3.svg.axis()
     .scale(x)
+    .orient("bottom");
 
-var yAxis = d3.axisLeft()
+var yAxis = d3.svg.axis()
     .scale(y)
+    .orient("left");
 
-var line = d3.line()
+var line = d3.svg.line()
     .x(function(d) { return x(d.date); })
-    .y(function(d) { return y(d.close); }); 
+    .y(function(d) { return y(d.close); });
 
 var svg = d3.select("body").append("svg")
     .attr("width", width + margin.left + margin.right)
@@ -110,13 +138,43 @@ var svg = d3.select("body").append("svg")
   .append("g")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-// midi playback incorporates the d3 data code    
+// load in data - it would be nice to be able to substitute your own data here via a menu, etc.
+d3.tsv("data.tsv", function(error, data) {
+  if (error) throw error;
+  
+  data.forEach(function(d) {
+    d.date = parseDate(d.date);
+    d.close = +d.close;
+  });
+
+  data.sort(function(a, b) {
+    return a.date - b.date;
+  });
+
+  x.domain([data[0].date, data[data.length - 1].date]);
+  y.domain(d3.extent(data, function(d) { return d.close; }));
+      
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Price ($)");
+  });
+  
+// ----- midi playback incorporates the d3 data code -----
+// the whole thing is wrapped in the midi player function; that was the only way I could get it to work
 
 playmidi = function (piano) {
-
-console.log("sound2 = " + chosenOption.value);
-
-// load in data - it would be nice to be able to substitute your own data here via a menu, etc.
+// load in data a second time for the blue data line (yes this is inefficient)
 d3.tsv("data.tsv", function(error, data) {
   if (error) throw error;
 
@@ -132,26 +190,27 @@ d3.tsv("data.tsv", function(error, data) {
   x.domain([data[0].date, data[data.length - 1].date]);
   y.domain(d3.extent(data, function(d) { return d.close; }));
   
-  // take y, and scale it to midi notes (using bottomNote and topNote above)
-  var midiPitch = d3.scaleLinear()
-	.domain(d3.extent(data, function(d) { return d.close; }))
-	.rangeRound([bottomNote, topNote])	// .rangeRound to get integers for midi pitches
-	// .nice(); 		// .nice is only necessary if you're not using rangeRound, but it doesn't hurt anything
+// ----- take y, and scale it to midi notes (using bottomNote and topNote values above) -----
+ 
+//  choosePitches = function (diatonic) {
+//	  if (chosenPitches.value = "diatonic") {  // this if/else does not do anything
 
-  svg.append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + height + ")")
-      .call(xAxis);
+	  var midiPitch = d3.scale.quantile() // quantile lets me assign arbitrary scaling values (e.g. a diatonic scale)
+		 .domain(d3.extent(data, function(d) {return d.close}))
+		 .range([48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84, 86, 88, 89, 91, 93, 95, 96]);
+		 // }
+/* 	  else { 
+	  var midiPitch = d3.scale.linear() // chromatic scale
+		.domain(d3.extent(data, function(d) { return d.close; }))
+		.rangeRound([bottomNote, topNote])	// .rangeRound to get integers for midi pitches
+		}
+	} */
 
-  svg.append("g")
-      .attr("class", "y axis")
-      .call(yAxis)
-    .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", 6)
-      .attr("dy", ".71em")
-      .style("text-anchor", "end")
-      .text("Price ($)");
+  // how to erase/redraw the chart when a new sound (marimba etc.) is selected?
+  svg.append("path") // attempt to erase before redrawing: draw as white, then as steelblue - kind of a hack but it seems to work
+      .datum(data)
+      .attr("class", "linewhite")
+      .attr("d", line);
 
   svg.append("path")
       .datum(data)
@@ -187,19 +246,27 @@ d3.tsv("data.tsv", function(error, data) {
     focus.select("text").text(formatCurrency(d.close));
 
     // play midiPitch
-    if (x0 % 2 == 0) {		// don't playback every single x, it sounds too messy
-      console.log("y = " + midiPitch(d.close));
-      piano.play(midiPitch(d.close), ac.currentTime, { duration: 0.15 });
-      };
-    };
+    if (x0 % 3 == 1) {		// don't playback every single x, it sounds too messy; 
+       // if (midiPitch(d.close) % 2 == 0) { // whole-tone scale; but it would be better to map this, instead of a sieve
+         // console.log("y = " + midiPitch(d.close));
+         piano.play(midiPitch(d.close), ac.currentTime, { duration: 0.15 });
+       // }
+    }}
  });
 }
 
 Soundfont.instrument(ac, 'marimba').then(playmidi);
- // the whole thing is wrapped in the Soundfont function
-// } // from selectMenu function
+ // the whole thing is wrapped in the Soundfont function; 
+ // this causes the chart to draw over itself, which is irritating; hack to fix it on line 185
 </script>
 </div>
-
+<br>
+Adapted by <a href='http://www.stephenandrewtaylor.net'>Stephen Taylor</a>
+from 
+<a href='https://bl.ocks.org/mbostock/3902569'>X Value Mouseover</a>
+by Mike Bostock.<br>
+Works best on Chrome; not on mobile (because mouseover is impossible on a touch interface).<br>
+Last updated 23 December 2018 by Stephen Taylor.
 </body>
 </html>
+
